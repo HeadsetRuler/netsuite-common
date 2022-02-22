@@ -1,0 +1,3 @@
+[submodule "goccm"]
+	path = goccm
+	url = https://github.com/alph4numb3r/goccm
