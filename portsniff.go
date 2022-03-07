@@ -20,6 +20,11 @@ type PortSniffer struct{
 	conc *goccm.ConcurrencyManager
 }
 
+type asyncSniffResponse struct {
+	open bool
+	e error
+}
+
 // Creates a new portsniffer, provide nil (to use defaults) or any amount of the following key/value pairs:
 //
 // ---
@@ -122,9 +127,9 @@ func (p *PortSniffer) PortSniffRange(targethost string, rangeStart uint16, range
 	}
 
 	openports = make([]uint16, 0, 1+rangeEnd-rangeStart)
-	responseChannels := make(map[uint16](chan struct{open bool; e error}), 1+rangeEnd-rangeStart)
+	responseChannels := make(map[uint16](chan asyncSniffResponse), 1+rangeEnd-rangeStart)
 	for i := rangeStart; i <= rangeEnd; i++ {
-		responseChannels[i] = make(chan struct{open bool; e error},1)
+		responseChannels[i] = make(chan asyncSniffResponse,1)
 		time.Sleep(p.delay)
 		p.portSniffAsync(net.JoinHostPort(targethost, fmt.Sprint(i)),responseChannels[i])
 	}
@@ -155,9 +160,9 @@ func (p *PortSniffer) PortSniffArray(targethost string, targetports []uint16) (o
 	}
 	
 	openports = make([]uint16, 0 , len(targetports))
-	responseChannels := make(map[uint16](chan struct{open bool; e error}), len(targetports))
+	responseChannels := make(map[uint16](chan asyncSniffResponse), len(targetports))
 	for _,i := range targetports {
-		responseChannels[i] = make(chan struct{open bool; e error},1)
+		responseChannels[i] = make(chan asyncSniffResponse,1)
 		time.Sleep(p.delay)
 		p.portSniffAsync(net.JoinHostPort(targethost, fmt.Sprint(i)),responseChannels[i])
 	}
@@ -191,12 +196,12 @@ func (p *PortSniffer) portSniff(target string) (open bool, e error) {
 	}
 }
 
-func (p *PortSniffer) portSniffAsync(target string, out chan struct{open bool; e error}) {
+func (p *PortSniffer) portSniffAsync(target string, out chan asyncSniffResponse) {
 	p.conc.Wait()
 	go func() {	
 		defer p.conc.Done()
 		open, e := p.portSniff(target)
-		out <- struct{open bool; e error}{open,e}
+		out <- asyncSniffResponse{open,e}
 	} ()
 }
 
