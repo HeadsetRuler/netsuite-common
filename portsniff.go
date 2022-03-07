@@ -15,6 +15,7 @@ import (
 //
 // ALL public functions return an array of open ports and an array of any errors encountered
 type PortSniffer struct{
+	delay time.Duration
 	timeout time.Duration
 	conc *goccm.ConcurrencyManager
 }
@@ -26,8 +27,11 @@ type PortSniffer struct{
 // timeout time.Duration (default 0.5 seconds) : timeout for each connection
 //
 // maxConc int (default 50) : maximum amount of concurrent connections
+//
+// delay time.Duration (default 50 ms) : delay between connections
 func NewPortSniffer(args map[string]interface{}) *PortSniffer {
 	const (
+		delayDefault time.Duration = time.Millisecond * 50
 		timeoutDefault time.Duration = time.Second / 2
 		maxConcDefault int = 50
 	)
@@ -60,10 +64,22 @@ func NewPortSniffer(args map[string]interface{}) *PortSniffer {
 		} else {
 			p.conc = goccm.New(maxConcDefault)
 		}
-
+		delayIn, delayExists := args["delay"]
+		if delayExists { // is the value provided?
+			delayTemp, valid := delayIn.(time.Duration)
+			if valid { // is it the correct type?
+				p.delay = delayTemp
+			} else {
+				log.Println("Argument 'delay' has invalid type, using default: ", delayDefault)
+				p.delay = delayDefault
+			}
+		} else {
+			p.delay = delayDefault
+		}
 	} else { // if args is empty, ALL DEFAULTS
-		p.timeout = timeoutDefault
+		p.delay = delayDefault
 		p.conc = goccm.New(maxConcDefault)
+		p.timeout = timeoutDefault
 	}
 	return p
 }
@@ -109,7 +125,7 @@ func (p *PortSniffer) PortSniffRange(targethost string, rangeStart uint16, range
 	responseChannels := make(map[uint16](chan struct{open bool; e error}), 1+rangeEnd-rangeStart)
 	for i := rangeStart; i <= rangeEnd; i++ {
 		responseChannels[i] = make(chan struct{open bool; e error},1)
-		time.Sleep(time.Millisecond * 50)
+		time.Sleep(p.delay)
 		p.portSniffAsync(net.JoinHostPort(targethost, fmt.Sprint(i)),responseChannels[i])
 	}
 	p.conc.WaitAllDone()
@@ -142,7 +158,7 @@ func (p *PortSniffer) PortSniffArray(targethost string, targetports []uint16) (o
 	responseChannels := make(map[uint16](chan struct{open bool; e error}), len(targetports))
 	for _,i := range targetports {
 		responseChannels[i] = make(chan struct{open bool; e error},1)
-		time.Sleep(time.Millisecond * 50)
+		time.Sleep(p.delay)
 		p.portSniffAsync(net.JoinHostPort(targethost, fmt.Sprint(i)),responseChannels[i])
 	}
 	p.conc.WaitAllDone()
