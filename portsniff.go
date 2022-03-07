@@ -25,11 +25,11 @@ type PortSniffer struct{
 //
 // timeout time.Duration (default 0.5 seconds) : timeout for each connection
 //
-// maxConc int (default 2000) : maximum amount of concurrent connections (ignored if 'conc' is succesfully provided)
+// maxConc int (default 50) : maximum amount of concurrent connections
 func NewPortSniffer(args map[string]interface{}) *PortSniffer {
 	const (
 		timeoutDefault time.Duration = time.Second / 2
-		maxConcDefault int = 2000
+		maxConcDefault int = 50
 	)
 
 	p := new(PortSniffer)
@@ -75,13 +75,13 @@ func (p *PortSniffer) PortSniffSingle(targethost string, port uint16) (openports
 		e = append(e, errors.New("invalid IP address:" + targethost))
 		return nil, e
 	}
-	openports = make([]uint16,1)
 	open, err := p.portSniff(net.JoinHostPort(targethost, fmt.Sprint(port)))
 	if err != nil {
 		e = append(e, err)
 		return nil, e
 	}
 	if open {
+		openports = make([]uint16,1)
 		openports[0] = port
 	}
 	return
@@ -108,10 +108,8 @@ func (p *PortSniffer) PortSniffRange(targethost string, rangeStart uint16, range
 	openports = make([]uint16, 0, 1+rangeEnd-rangeStart)
 	responseChannels := make(map[uint16](chan struct{open bool; e error}), 1+rangeEnd-rangeStart)
 	for i := rangeStart; i <= rangeEnd; i++ {
-		if i == 853 { 
-			log.Println("here!")
-		}
 		responseChannels[i] = make(chan struct{open bool; e error},1)
+		time.Sleep(time.Millisecond * 50)
 		p.portSniffAsync(net.JoinHostPort(targethost, fmt.Sprint(i)),responseChannels[i])
 	}
 	p.conc.WaitAllDone()
@@ -144,6 +142,7 @@ func (p *PortSniffer) PortSniffArray(targethost string, targetports []uint16) (o
 	responseChannels := make(map[uint16](chan struct{open bool; e error}), len(targetports))
 	for _,i := range targetports {
 		responseChannels[i] = make(chan struct{open bool; e error},1)
+		time.Sleep(time.Millisecond * 50)
 		p.portSniffAsync(net.JoinHostPort(targethost, fmt.Sprint(i)),responseChannels[i])
 	}
 	p.conc.WaitAllDone()
