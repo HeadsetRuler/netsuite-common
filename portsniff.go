@@ -166,7 +166,6 @@ func (p *PortSniffer) PortSniffArray(targethost string, targetports []uint16) (o
 		response := <-responseChannel
 		if response.e != nil {
 			e = append(e, response.e) 
-			return
 		}
 		if response.open {
 			openports = append(openports, uint16(i))
